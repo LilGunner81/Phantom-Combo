@@ -50,7 +50,7 @@ with st.sidebar:
         st.success("Data wiped! Redirecting...")
         st.rerun()
 
-FOOD_CATEGORIES = ["Italian", "Sushi", "Mediterranean", "Eastern Asian", "Sandwiches", "Asian", "Mexican", "South Asian", "Chicken", "Shop and Deliver", "Liquor", "Other"]
+FOOD_CATEGORIES = ["Italian", "Sushi", "Mediterranean", "Eastern Asian", "Bakery", "Sandwiches", "Asian", "Mexican", "South Asian", "Chicken", "Shop and Deliver", "Liquor", "Other"]
 WIN_LIMIT = 25
 
 def display_logo(width=None, stretch=False):
