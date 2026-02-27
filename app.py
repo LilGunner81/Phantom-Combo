@@ -34,7 +34,7 @@ if not df.empty and any(df['Score'].astype(int) >= WIN_LIMIT):
     winner_name = df[df['Score'].astype(int) >= WIN_LIMIT].iloc[0]['Name']
     st.balloons()
     st.markdown(f"<h1 style='text-align:center; color:#FFD700;'>🏆 {winner_name} WINS! 🏆</h1>", unsafe_allow_html=True)
-    st.image("1000003504.png", use_container_width=True)
+    st.image("Logo.png", use_container_width=True)
     if st.button("Start New Tournament"):
         df['Score'] = 0
         conn.update(data=df)
@@ -43,7 +43,7 @@ if not df.empty and any(df['Score'].astype(int) >= WIN_LIMIT):
 # --- SCREEN 2: SETUP ---
 elif len(df) < 2:
     col1, col2, col3 = st.columns([1, 2, 1])
-    with col2: st.image("1000003504.png", use_container_width=True)
+    with col2: st.image("Logo.png", use_container_width=True)
     p1_in = st.text_input("Player 1 Name")
     p2_in = st.text_input("Player 2 Name")
     if st.button("Save Players & Start"):
