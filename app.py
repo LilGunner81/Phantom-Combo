@@ -18,98 +18,76 @@ st.markdown("""
     </style>
     """, unsafe_allow_html=True)
 
-# --- GOOGLE SHEETS CONNECTION ---
+# --- DB CONNECTION ---
 conn = st.connection("gsheets", type=GSheetsConnection)
 
-# Fetch data safely
 try:
     df = conn.read()
 except:
-    # Creates a blank dataframe if the sheet is totally empty
     df = pd.DataFrame(columns=["Name", "Score"])
 
-# --- GAME LOGIC ---
 FOOD_CATEGORIES = ["Italian", "Sushi", "Mediterranean", "Eastern Asian", "Sandwiches", "Asian", "Mexican", "South Asian", "Chicken", "Shop and Deliver", "Liquor", "Other"]
 WIN_LIMIT = 25
 
-# Check if we already have players set up in the Sheet
-has_players = len(df) >= 2 and not df['Name'].isnull().all()
+# --- SCREEN 1: WINNER ---
+if not df.empty and any(df['Score'].astype(int) >= WIN_LIMIT):
+    winner_name = df[df['Score'].astype(int) >= WIN_LIMIT].iloc[0]['Name']
+    st.balloons()
+    st.markdown(f"<h1 style='text-align:center; color:#FFD700;'>🏆 {winner_name} WINS! 🏆</h1>", unsafe_allow_html=True)
+    st.image("1000003504.png", use_container_width=True)
+    if st.button("Start New Tournament"):
+        df['Score'] = 0
+        conn.update(data=df)
+        st.rerun()
 
-# --- SCREEN 1: SETUP (Only runs if Sheet is empty) ---
-if not has_players:
+# --- SCREEN 2: SETUP ---
+elif len(df) < 2:
     col1, col2, col3 = st.columns([1, 2, 1])
-    with col2:
-        st.image("Logo.png", use_container_width=True)
-    
-    st.write("<p style='text-align: center;'>New Tournament: Enter names to save to the Cloud.</p>", unsafe_allow_html=True)
-    p1_input = st.text_input("Player 1 Name")
-    p2_input = st.text_input("Player 2 Name")
-
-    if st.button("Initialize Tournament"):
-        if p1_input and p2_input:
-            new_data = pd.DataFrame([
-                {"Name": p1_input, "Score": 0},
-                {"Name": p2_input, "Score": 0}
-            ])
-            conn.update(data=new_data)
+    with col2: st.image("1000003504.png", use_container_width=True)
+    p1_in = st.text_input("Player 1 Name")
+    p2_in = st.text_input("Player 2 Name")
+    if st.button("Save Players & Start"):
+        if p1_in and p2_in:
+            new_df = pd.DataFrame([{"Name": p1_in, "Score": 0}, {"Name": p2_in, "Score": 0}])
+            conn.update(data=new_df)
             st.rerun()
-        else:
-            st.error("Please enter both names.")
 
-# --- SCREEN 2: THE GAME ---
+# --- SCREEN 3: GAME ---
 else:
-    p1_name, p1_score = df.iloc[0]['Name'], int(df.iloc[0]['Score'])
-    p2_name, p2_score = df.iloc[1]['Name'], int(df.iloc[1]['Score'])
+    p1_n, p1_s = df.iloc[0]['Name'], int(df.iloc[0]['Score'])
+    p2_n, p2_s = df.iloc[1]['Name'], int(df.iloc[1]['Score'])
 
-    # Winner Check
-    if p1_score >= WIN_LIMIT or p2_score >= WIN_LIMIT:
-        winner = p1_name if p1_score >= WIN_LIMIT else p2_name
-        st.balloons()
-        st.markdown(f"<h1 style='text-align:center;'>🏆 {winner} WINS! 🏆</h1>", unsafe_allow_html=True)
-        st.image("Logo.png", width=300)
-        if st.button("Reset Tournament"):
-            df['Score'] = 0
-            conn.update(data=df)
-            st.rerun()
-    else:
-        # Standard Game Header
-        c_logo, c_score = st.columns([1, 3])
-        with c_logo:
-            st.image("Logo.png", width=100)
-        with c_score:
-            st.markdown(f'<div class="score-box">{p1_score} — {p2_score}</div>', unsafe_allow_html=True)
+    c_logo, c_score = st.columns([1, 3])
+    with c_logo: st.image("1000003504.png", width=100)
+    with c_score: st.markdown(f'<div class="score-box">{p1_s} — {p2_s}</div>', unsafe_allow_html=True)
+    
+    st.progress(min(p1_s / WIN_LIMIT, 1.0), text=f"{p1_n}'s Path to Victory")
+    st.progress(min(p2_s / WIN_LIMIT, 1.0), text=f"{p2_n}'s Path to Victory")
+
+    st.divider()
+    col_a, col_b = st.columns(2)
+    with col_a:
+        st.markdown(f'<p class="player-label">{p1_n}</p>', unsafe_allow_html=True)
+        p1_p = st.number_input("Price Guess", key="p1p", format="%.2f")
+        p1_c = st.selectbox("Category", FOOD_CATEGORIES, key="p1c")
+    with col_b:
+        st.markdown(f'<p class="player-label">{p2_n}</p>', unsafe_allow_html=True)
+        p2_p = st.number_input("Price Guess", key="p2p", format="%.2f")
+        p2_c = st.selectbox("Category", FOOD_CATEGORIES, key="p2c")
+
+    st.divider()
+    actual_p = st.number_input("Actual Total Price", format="%.2f")
+    actual_c = st.selectbox("Actual Category", FOOD_CATEGORIES, key="actc")
+
+    if st.button("Submit Round Results"):
+        p1_r, p2_r = 0, 0
+        if p1_c == actual_c: p1_r += 1
+        if p2_c == actual_c: p2_r += 1
+        d1, d2 = abs(p1_p - actual_p), abs(p2_p - actual_p)
+        if d1 < d2: p1_r += 1
+        elif d2 < d1: p2_r += 1
         
-        st.markdown(f"<h3>{p1_name} vs {p2_name}</h3>", unsafe_allow_html=True)
-
-        # --- GUESSES & SUBMIT (Your existing logic) ---
-        col_a, col_b = st.columns(2)
-        with col_a:
-            st.markdown(f'<p class="player-label">{p1_name}</p>', unsafe_allow_html=True)
-            p1_p = st.number_input("Price Guess", key="p1p", format="%.2f")
-            p1_c = st.selectbox("Category", FOOD_CATEGORIES, key="p1s")
-        with col_b:
-            st.markdown(f'<p class="player-label">{p2_name}</p>', unsafe_allow_html=True)
-            p2_p = st.number_input("Price Guess", key="p2p", format="%.2f")
-            p2_c = st.selectbox("Category", FOOD_CATEGORIES, key="p2s")
-
-        st.divider()
-        actual_price = st.number_input("Actual Price", format="%.2f")
-        actual_cat = st.selectbox("Actual Category", FOOD_CATEGORIES, key="act")
-
-        if st.button("Submit Round"):
-            # Points Calculation
-            p1_round = 0
-            p2_round = 0
-            if p1_c == actual_cat: p1_round += 1
-            if p2_c == actual_cat: p2_round += 1
-            
-            p1_diff = abs(p1_p - actual_price)
-            p2_diff = abs(p2_p - actual_price)
-            if p1_diff < p2_diff: p1_round += 1
-            elif p2_diff < p1_diff: p2_round += 1
-
-            # Update DF and push to Google Sheets
-            df.at[0, 'Score'] = p1_score + p1_round
-            df.at[1, 'Score'] = p2_score + p2_round
-            conn.update(data=df)
-            st.rerun()
+        df.at[0, 'Score'] = p1_s + p1_r
+        df.at[1, 'Score'] = p2_s + p2_r
+        conn.update(data=df)
+        st.rerun()
