@@ -57,7 +57,7 @@ if not st.session_state.game_started:
     # Centering the logo
     col1, col2, col3 = st.columns([1, 2, 1])
     with col2:
-        st.image("1000003504.png", use_container_width=True)
+        st.image("logo.png", use_container_width=True)
     
     st.write("<p style='text-align: center; color: #a0a0a0;'>Enter your names to begin the duel.</p>", unsafe_allow_html=True)
 
