@@ -8,9 +8,18 @@ st.set_page_config(page_title="The Phantom Combo", page_icon="👻")
 st.markdown("""
     <style>
     .stApp { background-color: #121212; color: #FFFFFF; }
-    .stButton>button { width: 100%; background-color: #06C167 !important; color: #121212 !important; font-weight: bold; border-radius: 8px; border: none; }
+    .stButton>button { 
+        width: 100%; 
+        background-color: #06C167 !important; 
+        color: #121212 !important; 
+        font-weight: bold; 
+        border-radius: 8px; 
+        border: none; 
+    }
     .stTextInput>div>div>input, .stNumberInput>div>div>input, .stSelectbox>div>div>div {
-        background-color: #2a2a2a !important; color: white !important; border: 1px solid #444 !important;
+        background-color: #2a2a2a !important; 
+        color: white !important; 
+        border: 1px solid #444 !important;
     }
     h2, h3 { color: #06C167 !important; text-align: center; }
     .score-box { text-align: center; font-size: 3.5rem; font-weight: bold; color: #06C167; margin-top: -10px; }
@@ -21,20 +30,37 @@ st.markdown("""
 # --- DB CONNECTION ---
 conn = st.connection("gsheets", type=GSheetsConnection)
 
+# We removed the try/except block so you can see real connection errors if they happen
 try:
     df = conn.read()
-except:
+except Exception as e:
+    st.error(f"Connection Error: {e}")
+    st.info("Check if cell A1 is 'Name' and B1 is 'Score' in your Google Sheet.")
     df = pd.DataFrame(columns=["Name", "Score"])
+
+# Ensure data types are correct for calculations
+if not df.empty:
+    df['Score'] = pd.to_numeric(df['Score'], errors='coerce').fillna(0).astype(int)
 
 FOOD_CATEGORIES = ["Italian", "Sushi", "Mediterranean", "Eastern Asian", "Sandwiches", "Asian", "Mexican", "South Asian", "Chicken", "Shop and Deliver", "Liquor", "Other"]
 WIN_LIMIT = 25
 
+# Helper function to display logo safely
+def display_logo(width=None, stretch=False):
+    try:
+        if stretch:
+            st.image("Logo.png", use_container_width=True)
+        else:
+            st.image("Logo.png", width=width)
+    except:
+        st.markdown("### 👻 THE PHANTOM COMBO")
+
 # --- SCREEN 1: WINNER ---
-if not df.empty and any(df['Score'].astype(int) >= WIN_LIMIT):
-    winner_name = df[df['Score'].astype(int) >= WIN_LIMIT].iloc[0]['Name']
+if not df.empty and any(df['Score'] >= WIN_LIMIT):
+    winner_name = df[df['Score'] >= WIN_LIMIT].iloc[0]['Name']
     st.balloons()
     st.markdown(f"<h1 style='text-align:center; color:#FFD700;'>🏆 {winner_name} WINS! 🏆</h1>", unsafe_allow_html=True)
-    st.image("Logo.png", use_container_width=True)
+    display_logo(stretch=True)
     if st.button("Start New Tournament"):
         df['Score'] = 0
         conn.update(data=df)
@@ -43,14 +69,20 @@ if not df.empty and any(df['Score'].astype(int) >= WIN_LIMIT):
 # --- SCREEN 2: SETUP ---
 elif len(df) < 2:
     col1, col2, col3 = st.columns([1, 2, 1])
-    with col2: st.image("Logo.png", use_container_width=True)
-    p1_in = st.text_input("Player 1 Name")
-    p2_in = st.text_input("Player 2 Name")
+    with col2: 
+        display_logo(stretch=True)
+    
+    st.subheader("Tournament Setup")
+    p1_in = st.text_input("Player 1 Name", placeholder="Enter Name")
+    p2_in = st.text_input("Player 2 Name", placeholder="Enter Name")
+    
     if st.button("Save Players & Start"):
         if p1_in and p2_in:
             new_df = pd.DataFrame([{"Name": p1_in, "Score": 0}, {"Name": p2_in, "Score": 0}])
             conn.update(data=new_df)
             st.rerun()
+        else:
+            st.warning("Please enter both names.")
 
 # --- SCREEN 3: GAME ---
 else:
@@ -58,8 +90,10 @@ else:
     p2_n, p2_s = df.iloc[1]['Name'], int(df.iloc[1]['Score'])
 
     c_logo, c_score = st.columns([1, 3])
-    with c_logo: st.image("Logo.png", width=100)
-    with c_score: st.markdown(f'<div class="score-box">{p1_s} — {p2_s}</div>', unsafe_allow_html=True)
+    with c_logo: 
+        display_logo(width=100)
+    with c_score: 
+        st.markdown(f'<div class="score-box">{p1_s} — {p2_s}</div>', unsafe_allow_html=True)
     
     st.progress(min(p1_s / WIN_LIMIT, 1.0), text=f"{p1_n}'s Path to Victory")
     st.progress(min(p2_s / WIN_LIMIT, 1.0), text=f"{p2_n}'s Path to Victory")
@@ -68,21 +102,24 @@ else:
     col_a, col_b = st.columns(2)
     with col_a:
         st.markdown(f'<p class="player-label">{p1_n}</p>', unsafe_allow_html=True)
-        p1_p = st.number_input("Price Guess", key="p1p", format="%.2f")
+        p1_p = st.number_input("Price Guess", key="p1p", format="%.2f", min_value=0.0)
         p1_c = st.selectbox("Category", FOOD_CATEGORIES, key="p1c")
     with col_b:
         st.markdown(f'<p class="player-label">{p2_n}</p>', unsafe_allow_html=True)
-        p2_p = st.number_input("Price Guess", key="p2p", format="%.2f")
+        p2_p = st.number_input("Price Guess", key="p2p", format="%.2f", min_value=0.0)
         p2_c = st.selectbox("Category", FOOD_CATEGORIES, key="p2c")
 
     st.divider()
-    actual_p = st.number_input("Actual Total Price", format="%.2f")
+    actual_p = st.number_input("Actual Total Price", format="%.2f", min_value=0.0)
     actual_c = st.selectbox("Actual Category", FOOD_CATEGORIES, key="actc")
 
     if st.button("Submit Round Results"):
         p1_r, p2_r = 0, 0
+        # Category Points
         if p1_c == actual_c: p1_r += 1
         if p2_c == actual_c: p2_r += 1
+        
+        # Price Points (Closest guess)
         d1, d2 = abs(p1_p - actual_p), abs(p2_p - actual_p)
         if d1 < d2: p1_r += 1
         elif d2 < d1: p2_r += 1
@@ -91,3 +128,4 @@ else:
         df.at[1, 'Score'] = p2_s + p2_r
         conn.update(data=df)
         st.rerun()
+
