@@ -1,50 +1,76 @@
 import streamlit as st
 from streamlit_gsheets import GSheetsConnection
 import pandas as pd
+import base64
 
 # --- CONFIG & STYLING ---
 st.set_page_config(page_title="The Phantom Combo", page_icon="👻")
 
-st.markdown("""
+# 1. DEFINE PWA MANIFEST (Base64 Injection for Streamlit Cloud)
+manifest_data = """
+{
+  "name": "The Phantom Combo",
+  "short_name": "Phantom",
+  "start_url": ".",
+  "display": "standalone",
+  "background_color": "#0E1117",
+  "theme_color": "#06C167",
+  "icons": [
+    {
+      "src": "https://raw.githubusercontent.com/LilGunner/Phantom-Combo/main/Logo.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ]
+}
+"""
+manifest_b64 = base64.b64encode(manifest_data.encode()).decode()
+manifest_link = f"data:application/json;base64,{manifest_b64}"
+
+st.markdown(f"""
+    <link rel="manifest" href="{manifest_link}">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <link rel="apple-touch-icon" href="https://raw.githubusercontent.com/LilGunner/Phantom-Combo/main/Logo.png">
+    
     <style>
     /* Main Background */
-    .stApp { background-color: #0E1117; color: #FFFFFF; }
+    .stApp {{ background-color: #0E1117; color: #FFFFFF; }}
     
-    /* THE CONTRAST BOX: Deep charcoal for the form background */
-    [data-testid="stForm"] {
+    /* THE CONTRAST BOX */
+    [data-testid="stForm"] {{
         background-color: #1A1C23 !important; 
         padding: 2.5rem;
         border-radius: 20px;
         border: 1px solid #333;
         box-shadow: 0 4px 15px rgba(0,0,0,0.5);
-    }
+    }}
 
-    /* FULL WIDTH IMAGE: Forces the logo to span the container width */
-    [data-testid="stImage"] {
+    /* FULL WIDTH IMAGE */
+    [data-testid="stImage"] {{
         display: flex;
         justify-content: center;
         width: 100%;
-    }
+    }}
     
-    [data-testid="stImage"] > img {
+    [data-testid="stImage"] > img {{
         width: 100% !important;
         height: auto;
-    }
+    }}
 
     /* PHANTOM GREEN PROGRESS BARS */
-    .stProgress > div > div > div > div {
+    .stProgress > div > div > div > div {{
         background-color: #06C167 !important;
-    }
+    }}
 
-    /* Remove default Streamlit top padding to bring logo higher */
-    .block-container {
+    .block-container {{
         padding-top: 0.5rem !important;
         padding-left: 1rem !important;
         padding-right: 1rem !important;
-    }
+    }}
 
     /* Buttons */
-    .stButton>button { 
+    .stButton>button {{ 
         width: 100%; 
         background-color: #06C167 !important; 
         color: #121212 !important; 
@@ -52,18 +78,18 @@ st.markdown("""
         border-radius: 8px; 
         border: none; 
         height: 3em;
-    }
+    }}
 
     /* Input Boxes */
-    .stTextInput>div>div>input, .stNumberInput>div>div>input, .stSelectbox>div>div>div {
+    .stTextInput>div>div>input, .stNumberInput>div>div>input, .stSelectbox>div>div>div {{
         background-color: #2D2D2D !important; 
         color: white !important; 
         border: 1px solid #444 !important;
-    }
+    }}
     
-    h2, h3 { color: #06C167 !important; text-align: center; font-weight: 800; }
-    .score-box { text-align: center; font-size: 4rem; font-weight: bold; color: #06C167; padding: 5px 0; }
-    .player-label { font-size: 1.4rem; font-weight: bold; color: #06C167; text-align: center; display: block; margin-bottom: 5px; }
+    h2, h3 {{ color: #06C167 !important; text-align: center; font-weight: 800; }}
+    .score-box {{ text-align: center; font-size: 4rem; font-weight: bold; color: #06C167; padding: 5px 0; }}
+    .player-label {{ font-size: 1.4rem; font-weight: bold; color: #06C167; text-align: center; display: block; margin-bottom: 5px; }}
     </style>
     """, unsafe_allow_html=True)
 
@@ -91,10 +117,8 @@ with st.sidebar:
 FOOD_CATEGORIES = ["Italian", "Sushi", "Mediterranean", "Eastern Asian", "Sandwiches", "Asian", "Mexican", "South Asian", "Chicken", "Shop and Deliver", "Liquor", "Other"]
 WIN_LIMIT = 25
 
-# --- UPDATED LOGO FUNCTION ---
 def display_logo():
     try:
-        # use_container_width=True makes it expand to the full width of the app column
         st.image("Logo.png", use_container_width=True)
     except:
         st.markdown("<h1 style='text-align:center; color:#06C167;'>👻 THE PHANTOM COMBO</h1>", unsafe_allow_html=True)
@@ -122,7 +146,6 @@ elif len(df) < 2:
             st.rerun()
 
 else:
-    # Game Screen
     display_logo()
     p1_n, p1_s = df.iloc[0]['Name'], int(df.iloc[0]['Score'])
     p2_n, p2_s = df.iloc[1]['Name'], int(df.iloc[1]['Score'])
@@ -134,19 +157,13 @@ else:
 
     with st.form("round_form"):
         st.markdown("### 🎲 ROUND DATA")
-        
-        # Player 1 Section
         st.markdown(f'<p class="player-label">{p1_n}</p>', unsafe_allow_html=True)
         p1_p = st.number_input("Price Guess", key="p1p", format="%.2f", step=0.01)
         p1_c = st.selectbox("Category Guess", FOOD_CATEGORIES, key="p1c")
-        
         st.divider()
-        
-        # Player 2 Section
         st.markdown(f'<p class="player-label">{p2_n}</p>', unsafe_allow_html=True)
         p2_p = st.number_input("Price Guess", key="p2p", format="%.2f", step=0.01)
         p2_c = st.selectbox("Category Guess", FOOD_CATEGORIES, key="p2c")
-
         st.divider()
         actual_p = st.number_input("Actual Total Price", format="%.2f", step=0.01)
         actual_c = st.selectbox("Actual Category", FOOD_CATEGORIES, key="actc")
@@ -155,7 +172,6 @@ else:
             p1_r, p2_r = 0, 0
             if p1_c == actual_c: p1_r += 1
             if p2_c == actual_c: p2_r += 1
-            
             d1, d2 = abs(p1_p - actual_p), abs(p2_p - actual_p)
             if d1 < d2: p1_r += 1
             elif d2 < d1: p2_r += 1
