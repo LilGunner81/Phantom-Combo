@@ -58,7 +58,7 @@ else:
     p2_n, p2_s = df.iloc[1]['Name'], int(df.iloc[1]['Score'])
 
     c_logo, c_score = st.columns([1, 3])
-    with c_logo: st.image("1000003504.png", width=100)
+    with c_logo: st.image("Logo.png", width=100)
     with c_score: st.markdown(f'<div class="score-box">{p1_s} — {p2_s}</div>', unsafe_allow_html=True)
     
     st.progress(min(p1_s / WIN_LIMIT, 1.0), text=f"{p1_n}'s Path to Victory")
