@@ -1,0 +1,20 @@
+{
+  "name": "The Phantom Combo",
+  "short_name": "PhantomCombo",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#0E1117",
+  "theme_color": "#06C167",
+  "icons": [
+    {
+      "src": "Logo.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "Logo.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ]
+}
