@@ -31,15 +31,24 @@ st.markdown("""
 conn = st.connection("gsheets", type=GSheetsConnection)
 
 try:
-    # ttl=0 ensures we don't show cached old scores after an update
     df = conn.read(ttl=0)
 except Exception as e:
     st.error(f"Connection Error: {e}")
     df = pd.DataFrame(columns=["Name", "Score"])
 
-# Data cleaning
+# Ensure data types
 if not df.empty:
     df['Score'] = pd.to_numeric(df['Score'], errors='coerce').fillna(0).astype(int)
+
+# --- SIDEBAR RESET ---
+with st.sidebar:
+    st.header("Admin Controls")
+    if st.button("🗑️ Reset All (New Players)"):
+        # Create an empty dataframe with the correct columns
+        empty_df = pd.DataFrame(columns=["Name", "Score"])
+        conn.update(data=empty_df)
+        st.success("Data wiped! Redirecting...")
+        st.rerun()
 
 FOOD_CATEGORIES = ["Italian", "Sushi", "Mediterranean", "Eastern Asian", "Sandwiches", "Asian", "Mexican", "South Asian", "Chicken", "Shop and Deliver", "Liquor", "Other"]
 WIN_LIMIT = 25
@@ -55,8 +64,7 @@ def display_logo(width=None, stretch=False):
 
 # --- SCREEN 1: WINNER ---
 if not df.empty and any(df['Score'] >= WIN_LIMIT):
-    winner_row = df[df['Score'] >= WIN_LIMIT].iloc[0]
-    winner_name = winner_row['Name']
+    winner_name = df[df['Score'] >= WIN_LIMIT].iloc[0]['Name']
     st.balloons()
     st.markdown(f"<h1 style='text-align:center; color:#FFD700;'>🏆 {winner_name} WINS! 🏆</h1>", unsafe_allow_html=True)
     display_logo(stretch=True)
@@ -65,7 +73,7 @@ if not df.empty and any(df['Score'] >= WIN_LIMIT):
         conn.update(data=df)
         st.rerun()
 
-# --- SCREEN 2: SETUP ---
+# --- SCREEN 2: SETUP (Shows if 0 or 1 players found) ---
 elif len(df) < 2:
     col1, col2, col3 = st.columns([1, 2, 1])
     with col2: 
@@ -97,7 +105,6 @@ else:
     st.progress(min(p1_s / WIN_LIMIT, 1.0), text=f"{p1_n}'s Path to Victory")
     st.progress(min(p2_s / WIN_LIMIT, 1.0), text=f"{p2_n}'s Path to Victory")
 
-    # Wrap inputs in a form so the app doesn't refresh until "Submit" is clicked
     with st.form("round_form"):
         st.divider()
         col_a, col_b = st.columns(2)
@@ -118,32 +125,16 @@ else:
 
     if submit_btn:
         p1_r, p2_r = 0, 0
-        
-        # 1. Category Points
         if p1_c == actual_c: p1_r += 1
         if p2_c == actual_c: p2_r += 1
         
-        # 2. Price Points (Closest guess gets a point)
-        d1 = abs(p1_p - actual_p)
-        d2 = abs(p2_p - actual_p)
-        
-        if d1 < d2:
-            p1_r += 1
-        elif d2 < d1:
-            p2_r += 1
+        d1, d2 = abs(p1_p - actual_p), abs(p2_p - actual_p)
+        if d1 < d2: p1_r += 1
+        elif d2 < d1: p2_r += 1
         else:
-            # Distance is exactly the same (or both guessed same price)
-            p1_r += 1
-            p2_r += 1
+            p1_r += 1; p2_r += 1
         
-        # Calculate new totals
-        new_p1_score = p1_s + p1_r
-        new_p2_score = p2_s + p2_r
-        
-        # Update the DataFrame and push to GSheets
-        df.at[0, 'Score'] = new_p1_score
-        df.at[1, 'Score'] = new_p2_score
+        df.at[0, 'Score'] = p1_s + p1_r
+        df.at[1, 'Score'] = p2_s + p2_r
         conn.update(data=df)
-        
-        st.toast(f"Round Complete! {p1_n}: +{p1_r} | {p2_n}: +{p2_r}")
         st.rerun()
