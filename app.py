@@ -12,21 +12,30 @@ st.markdown("""
     
     /* THE CONTRAST BOX: Deep charcoal for the form background */
     [data-testid="stForm"] {
-        background-color: #1E1E1E !important; 
+        background-color: #1A1C23 !important; 
         padding: 2.5rem;
         border-radius: 20px;
         border: 1px solid #333;
         box-shadow: 0 4px 15px rgba(0,0,0,0.5);
     }
 
-    /* Force all images to center and remove top padding */
+    /* MOBILE-FIRST CENTERING: This forces the image to center on phones */
     [data-testid="stImage"] {
         display: flex;
         justify-content: center;
+        width: 100%;
+    }
+    
+    [data-testid="stImage"] > img {
         margin-left: auto;
         margin-right: auto;
     }
-    
+
+    /* PHANTOM GREEN PROGRESS BARS */
+    .stProgress > div > div > div > div {
+        background-color: #06C167 !important;
+    }
+
     /* Remove default Streamlit top padding to bring logo higher */
     .block-container {
         padding-top: 1rem !important;
@@ -43,7 +52,7 @@ st.markdown("""
         height: 3em;
     }
 
-    /* Input Boxes */
+    /* Input Boxes - Lighter grey to contrast the charcoal form */
     .stTextInput>div>div>input, .stNumberInput>div>div>input, .stSelectbox>div>div>div {
         background-color: #2D2D2D !important; 
         color: white !important; 
@@ -80,16 +89,13 @@ with st.sidebar:
 FOOD_CATEGORIES = ["Italian", "Sushi", "Mediterranean", "Eastern Asian", "Sandwiches", "Asian", "Mexican", "South Asian", "Chicken", "Shop and Deliver", "Liquor", "Other"]
 WIN_LIMIT = 25
 
-# --- UPDATED LOGO FUNCTION ---
-def display_logo(width=250):
-    # Using a 3-column layout where the middle column holds the image
-    # This is the most reliable way to center in Streamlit
-    col1, col2, col3 = st.columns([1, 2, 1])
-    with col2:
-        try:
-            st.image("Logo.png", width=width)
-        except:
-            st.markdown("<h1 style='text-align:center; color:#06C167;'>👻 THE PHANTOM COMBO</h1>", unsafe_allow_html=True)
+# --- LOGO FUNCTION ---
+def display_logo(width=220):
+    try:
+        # st.image will now respect our CSS Flexbox centering
+        st.image("Logo.png", width=width)
+    except:
+        st.markdown("<h1 style='text-align:center; color:#06C167;'>👻 THE PHANTOM COMBO</h1>", unsafe_allow_html=True)
 
 # --- NAVIGATION LOGIC ---
 if not df.empty and any(df['Score'] >= WIN_LIMIT):
@@ -114,8 +120,8 @@ elif len(df) < 2:
             st.rerun()
 
 else:
-    # Game Screen Logo
-    display_logo(width=220)
+    # Game Screen
+    display_logo(width=200)
     p1_n, p1_s = df.iloc[0]['Name'], int(df.iloc[0]['Score'])
     p2_n, p2_s = df.iloc[1]['Name'], int(df.iloc[1]['Score'])
 
@@ -126,15 +132,18 @@ else:
 
     with st.form("round_form"):
         st.markdown("### 🎲 ROUND DATA")
-        col_a, col_b = st.columns(2)
-        with col_a:
-            st.markdown(f'<p class="player-label">{p1_n}</p>', unsafe_allow_html=True)
-            p1_p = st.number_input("Price Guess", key="p1p", format="%.2f", step=0.01)
-            p1_c = st.selectbox("Category", FOOD_CATEGORIES, key="p1c")
-        with col_b:
-            st.markdown(f'<p class="player-label">{p2_n}</p>', unsafe_allow_html=True)
-            p2_p = st.number_input("Price Guess", key="p2p", format="%.2f", step=0.01)
-            p2_c = st.selectbox("Category", FOOD_CATEGORIES, key="p2c")
+        
+        # Player 1 Section
+        st.markdown(f'<p class="player-label">{p1_n}</p>', unsafe_allow_html=True)
+        p1_p = st.number_input("Price Guess", key="p1p", format="%.2f", step=0.01)
+        p1_c = st.selectbox("Category Guess", FOOD_CATEGORIES, key="p1c")
+        
+        st.divider()
+        
+        # Player 2 Section
+        st.markdown(f'<p class="player-label">{p2_n}</p>', unsafe_allow_html=True)
+        p2_p = st.number_input("Price Guess", key="p2p", format="%.2f", step=0.01)
+        p2_c = st.selectbox("Category Guess", FOOD_CATEGORIES, key="p2c")
 
         st.divider()
         actual_p = st.number_input("Actual Total Price", format="%.2f", step=0.01)
