@@ -57,7 +57,7 @@ if not st.session_state.game_started:
     # Centering the logo
     col1, col2, col3 = st.columns([1, 2, 1])
     with col2:
-        st.image("logo.png", use_container_width=True)
+        st.image("Logo.png", use_container_width=True)
     
     st.write("<p style='text-align: center; color: #a0a0a0;'>Enter your names to begin the duel.</p>", unsafe_allow_html=True)
 
@@ -76,7 +76,7 @@ if not st.session_state.game_started:
 # --- SCREEN 2: GAME ---
 else:
     # Small logo at the top for game screen
-    st.image("logo.png", width=150)
+    st.image("Logo.png", width=150)
     
     st.markdown(f'<div class="score-box">{st.session_state.p1_score} — {st.session_state.p2_score}</div>', unsafe_allow_html=True)
     st.markdown(f"<h3 style='text-align: center;'>{st.session_state.p1_name} vs {st.session_state.p2_name}</h3>", unsafe_allow_html=True)
