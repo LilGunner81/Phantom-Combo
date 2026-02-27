@@ -19,10 +19,17 @@ st.markdown("""
         box-shadow: 0 4px 15px rgba(0,0,0,0.5);
     }
 
-    /* Centering the logo image */
+    /* Force all images to center and remove top padding */
     [data-testid="stImage"] {
         display: flex;
         justify-content: center;
+        margin-left: auto;
+        margin-right: auto;
+    }
+    
+    /* Remove default Streamlit top padding to bring logo higher */
+    .block-container {
+        padding-top: 1rem !important;
     }
 
     /* Buttons */
@@ -36,7 +43,7 @@ st.markdown("""
         height: 3em;
     }
 
-    /* Input Boxes (The Grey Boxes) - Darker and more defined */
+    /* Input Boxes */
     .stTextInput>div>div>input, .stNumberInput>div>div>input, .stSelectbox>div>div>div {
         background-color: #2D2D2D !important; 
         color: white !important; 
@@ -44,7 +51,7 @@ st.markdown("""
     }
     
     h2, h3 { color: #06C167 !important; text-align: center; font-weight: 800; }
-    .score-box { text-align: center; font-size: 4rem; font-weight: bold; color: #06C167; padding: 20px 0; }
+    .score-box { text-align: center; font-size: 4rem; font-weight: bold; color: #06C167; padding: 10px 0; }
     .player-label { font-size: 1.4rem; font-weight: bold; color: #06C167; text-align: center; display: block; margin-bottom: 5px; }
     </style>
     """, unsafe_allow_html=True)
@@ -75,19 +82,20 @@ WIN_LIMIT = 25
 
 # --- UPDATED LOGO FUNCTION ---
 def display_logo(width=250):
-    try:
-        # We use a container to help with centering and sizing
-        _, col_mid, _ = st.columns([1, 2, 1])
-        with col_mid:
+    # Using a 3-column layout where the middle column holds the image
+    # This is the most reliable way to center in Streamlit
+    col1, col2, col3 = st.columns([1, 2, 1])
+    with col2:
+        try:
             st.image("Logo.png", width=width)
-    except:
-        st.markdown("<h1 style='text-align:center; color:#06C167;'>👻 THE PHANTOM COMBO</h1>", unsafe_allow_html=True)
+        except:
+            st.markdown("<h1 style='text-align:center; color:#06C167;'>👻 THE PHANTOM COMBO</h1>", unsafe_allow_html=True)
 
 # --- NAVIGATION LOGIC ---
 if not df.empty and any(df['Score'] >= WIN_LIMIT):
     winner_name = df[df['Score'] >= WIN_LIMIT].iloc[0]['Name']
     st.balloons()
-    display_logo(width=350)
+    display_logo(width=300)
     st.markdown(f"<h1 style='text-align:center; color:#FFD700;'>🏆 {winner_name} WINS! 🏆</h1>", unsafe_allow_html=True)
     if st.button("Start New Tournament"):
         df['Score'] = 0
@@ -95,10 +103,10 @@ if not df.empty and any(df['Score'] >= WIN_LIMIT):
         st.rerun()
 
 elif len(df) < 2:
-    display_logo(width=300)
+    display_logo(width=280)
     st.subheader("Tournament Setup")
-    p1_in = st.text_input("Player 1 Name", placeholder="e.g. Lil")
-    p2_in = st.text_input("Player 2 Name", placeholder="e.g. Gun")
+    p1_in = st.text_input("Player 1 Name")
+    p2_in = st.text_input("Player 2 Name")
     if st.button("Save Players & Start"):
         if p1_in and p2_in:
             new_df = pd.DataFrame([{"Name": p1_in, "Score": 0}, {"Name": p2_in, "Score": 0}])
@@ -106,17 +114,16 @@ elif len(df) < 2:
             st.rerun()
 
 else:
+    # Game Screen Logo
+    display_logo(width=220)
     p1_n, p1_s = df.iloc[0]['Name'], int(df.iloc[0]['Score'])
     p2_n, p2_s = df.iloc[1]['Name'], int(df.iloc[1]['Score'])
 
-    # Big Central Logo for Game Screen
-    display_logo(width=200)
     st.markdown(f'<div class="score-box">{p1_s} — {p2_s}</div>', unsafe_allow_html=True)
     
     st.progress(min(p1_s / WIN_LIMIT, 1.0), text=f"{p1_n}'s Path")
     st.progress(min(p2_s / WIN_LIMIT, 1.0), text=f"{p2_n}'s Path")
 
-    # --- INPUT FORM WITH CONTRAST ---
     with st.form("round_form"):
         st.markdown("### 🎲 ROUND DATA")
         col_a, col_b = st.columns(2)
@@ -137,6 +144,7 @@ else:
             p1_r, p2_r = 0, 0
             if p1_c == actual_c: p1_r += 1
             if p2_c == actual_c: p2_r += 1
+            
             d1, d2 = abs(p1_p - actual_p), abs(p2_p - actual_p)
             if d1 < d2: p1_r += 1
             elif d2 < d1: p2_r += 1
