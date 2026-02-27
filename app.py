@@ -19,7 +19,7 @@ st.markdown("""
         box-shadow: 0 4px 15px rgba(0,0,0,0.5);
     }
 
-    /* MOBILE-FIRST CENTERING: This forces the image to center on phones */
+    /* FULL WIDTH IMAGE: Forces the logo to span the container width */
     [data-testid="stImage"] {
         display: flex;
         justify-content: center;
@@ -27,8 +27,8 @@ st.markdown("""
     }
     
     [data-testid="stImage"] > img {
-        margin-left: auto;
-        margin-right: auto;
+        width: 100% !important;
+        height: auto;
     }
 
     /* PHANTOM GREEN PROGRESS BARS */
@@ -38,7 +38,9 @@ st.markdown("""
 
     /* Remove default Streamlit top padding to bring logo higher */
     .block-container {
-        padding-top: 1rem !important;
+        padding-top: 0.5rem !important;
+        padding-left: 1rem !important;
+        padding-right: 1rem !important;
     }
 
     /* Buttons */
@@ -52,7 +54,7 @@ st.markdown("""
         height: 3em;
     }
 
-    /* Input Boxes - Lighter grey to contrast the charcoal form */
+    /* Input Boxes */
     .stTextInput>div>div>input, .stNumberInput>div>div>input, .stSelectbox>div>div>div {
         background-color: #2D2D2D !important; 
         color: white !important; 
@@ -60,7 +62,7 @@ st.markdown("""
     }
     
     h2, h3 { color: #06C167 !important; text-align: center; font-weight: 800; }
-    .score-box { text-align: center; font-size: 4rem; font-weight: bold; color: #06C167; padding: 10px 0; }
+    .score-box { text-align: center; font-size: 4rem; font-weight: bold; color: #06C167; padding: 5px 0; }
     .player-label { font-size: 1.4rem; font-weight: bold; color: #06C167; text-align: center; display: block; margin-bottom: 5px; }
     </style>
     """, unsafe_allow_html=True)
@@ -89,11 +91,11 @@ with st.sidebar:
 FOOD_CATEGORIES = ["Italian", "Sushi", "Mediterranean", "Eastern Asian", "Sandwiches", "Asian", "Mexican", "South Asian", "Chicken", "Shop and Deliver", "Liquor", "Other"]
 WIN_LIMIT = 25
 
-# --- LOGO FUNCTION ---
-def display_logo(width=220):
+# --- UPDATED LOGO FUNCTION ---
+def display_logo():
     try:
-        # st.image will now respect our CSS Flexbox centering
-        st.image("Logo.png", width=width)
+        # use_container_width=True makes it expand to the full width of the app column
+        st.image("Logo.png", use_container_width=True)
     except:
         st.markdown("<h1 style='text-align:center; color:#06C167;'>👻 THE PHANTOM COMBO</h1>", unsafe_allow_html=True)
 
@@ -101,7 +103,7 @@ def display_logo(width=220):
 if not df.empty and any(df['Score'] >= WIN_LIMIT):
     winner_name = df[df['Score'] >= WIN_LIMIT].iloc[0]['Name']
     st.balloons()
-    display_logo(width=300)
+    display_logo()
     st.markdown(f"<h1 style='text-align:center; color:#FFD700;'>🏆 {winner_name} WINS! 🏆</h1>", unsafe_allow_html=True)
     if st.button("Start New Tournament"):
         df['Score'] = 0
@@ -109,7 +111,7 @@ if not df.empty and any(df['Score'] >= WIN_LIMIT):
         st.rerun()
 
 elif len(df) < 2:
-    display_logo(width=280)
+    display_logo()
     st.subheader("Tournament Setup")
     p1_in = st.text_input("Player 1 Name")
     p2_in = st.text_input("Player 2 Name")
@@ -121,7 +123,7 @@ elif len(df) < 2:
 
 else:
     # Game Screen
-    display_logo(width=200)
+    display_logo()
     p1_n, p1_s = df.iloc[0]['Name'], int(df.iloc[0]['Score'])
     p2_n, p2_s = df.iloc[1]['Name'], int(df.iloc[1]['Score'])
 
