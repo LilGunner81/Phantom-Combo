@@ -30,22 +30,20 @@ st.markdown("""
 # --- DB CONNECTION ---
 conn = st.connection("gsheets", type=GSheetsConnection)
 
-# We removed the try/except block so you can see real connection errors if they happen
 try:
-    df = conn.read()
+    # ttl=0 ensures we don't show cached old scores after an update
+    df = conn.read(ttl=0)
 except Exception as e:
     st.error(f"Connection Error: {e}")
-    st.info("Check if cell A1 is 'Name' and B1 is 'Score' in your Google Sheet.")
     df = pd.DataFrame(columns=["Name", "Score"])
 
-# Ensure data types are correct for calculations
+# Data cleaning
 if not df.empty:
     df['Score'] = pd.to_numeric(df['Score'], errors='coerce').fillna(0).astype(int)
 
 FOOD_CATEGORIES = ["Italian", "Sushi", "Mediterranean", "Eastern Asian", "Sandwiches", "Asian", "Mexican", "South Asian", "Chicken", "Shop and Deliver", "Liquor", "Other"]
 WIN_LIMIT = 25
 
-# Helper function to display logo safely
 def display_logo(width=None, stretch=False):
     try:
         if stretch:
@@ -57,7 +55,8 @@ def display_logo(width=None, stretch=False):
 
 # --- SCREEN 1: WINNER ---
 if not df.empty and any(df['Score'] >= WIN_LIMIT):
-    winner_name = df[df['Score'] >= WIN_LIMIT].iloc[0]['Name']
+    winner_row = df[df['Score'] >= WIN_LIMIT].iloc[0]
+    winner_name = winner_row['Name']
     st.balloons()
     st.markdown(f"<h1 style='text-align:center; color:#FFD700;'>🏆 {winner_name} WINS! 🏆</h1>", unsafe_allow_html=True)
     display_logo(stretch=True)
@@ -98,34 +97,53 @@ else:
     st.progress(min(p1_s / WIN_LIMIT, 1.0), text=f"{p1_n}'s Path to Victory")
     st.progress(min(p2_s / WIN_LIMIT, 1.0), text=f"{p2_n}'s Path to Victory")
 
-    st.divider()
-    col_a, col_b = st.columns(2)
-    with col_a:
-        st.markdown(f'<p class="player-label">{p1_n}</p>', unsafe_allow_html=True)
-        p1_p = st.number_input("Price Guess", key="p1p", format="%.2f", min_value=0.0)
-        p1_c = st.selectbox("Category", FOOD_CATEGORIES, key="p1c")
-    with col_b:
-        st.markdown(f'<p class="player-label">{p2_n}</p>', unsafe_allow_html=True)
-        p2_p = st.number_input("Price Guess", key="p2p", format="%.2f", min_value=0.0)
-        p2_c = st.selectbox("Category", FOOD_CATEGORIES, key="p2c")
+    # Wrap inputs in a form so the app doesn't refresh until "Submit" is clicked
+    with st.form("round_form"):
+        st.divider()
+        col_a, col_b = st.columns(2)
+        with col_a:
+            st.markdown(f'<p class="player-label">{p1_n}</p>', unsafe_allow_html=True)
+            p1_p = st.number_input("Price Guess", key="p1p", format="%.2f", min_value=0.0)
+            p1_c = st.selectbox("Category Guess", FOOD_CATEGORIES, key="p1c")
+        with col_b:
+            st.markdown(f'<p class="player-label">{p2_n}</p>', unsafe_allow_html=True)
+            p2_p = st.number_input("Price Guess", key="p2p", format="%.2f", min_value=0.0)
+            p2_c = st.selectbox("Category Guess", FOOD_CATEGORIES, key="p2c")
 
-    st.divider()
-    actual_p = st.number_input("Actual Total Price", format="%.2f", min_value=0.0)
-    actual_c = st.selectbox("Actual Category", FOOD_CATEGORIES, key="actc")
+        st.divider()
+        actual_p = st.number_input("Actual Total Price", format="%.2f", min_value=0.0)
+        actual_c = st.selectbox("Actual Category", FOOD_CATEGORIES, key="actc")
+        
+        submit_btn = st.form_submit_button("Submit Round Results")
 
-    if st.button("Submit Round Results"):
+    if submit_btn:
         p1_r, p2_r = 0, 0
-        # Category Points
+        
+        # 1. Category Points
         if p1_c == actual_c: p1_r += 1
         if p2_c == actual_c: p2_r += 1
         
-        # Price Points (Closest guess)
-        d1, d2 = abs(p1_p - actual_p), abs(p2_p - actual_p)
-        if d1 < d2: p1_r += 1
-        elif d2 < d1: p2_r += 1
+        # 2. Price Points (Closest guess gets a point)
+        d1 = abs(p1_p - actual_p)
+        d2 = abs(p2_p - actual_p)
         
-        df.at[0, 'Score'] = p1_s + p1_r
-        df.at[1, 'Score'] = p2_s + p2_r
+        if d1 < d2:
+            p1_r += 1
+        elif d2 < d1:
+            p2_r += 1
+        else:
+            # Distance is exactly the same (or both guessed same price)
+            p1_r += 1
+            p2_r += 1
+        
+        # Calculate new totals
+        new_p1_score = p1_s + p1_r
+        new_p2_score = p2_s + p2_r
+        
+        # Update the DataFrame and push to GSheets
+        df.at[0, 'Score'] = new_p1_score
+        df.at[1, 'Score'] = new_p2_score
         conn.update(data=df)
+        
+        st.toast(f"Round Complete! {p1_n}: +{p1_r} | {p2_n}: +{p2_r}")
         st.rerun()
-
