@@ -103,10 +103,10 @@ except Exception as e:
     df = pd.DataFrame(columns=["Name", "Score"])
 
 if not df.empty:
-    # IMPORTANT: Scores are now floats to handle 0.5 point increments
+    # Set to float to handle 0.5 scoring
     df['Score'] = pd.to_numeric(df['Score'], errors='coerce').fillna(0).astype(float)
 
-# --- SIDEBAR RESET ---
+# --- SIDEBAR RESET (RESTORED) ---
 with st.sidebar:
     st.header("Admin Controls")
     if st.button("🗑️ Reset All (New Players)"):
@@ -124,7 +124,7 @@ def display_logo():
     except:
         st.markdown("<h1 style='text-align:center; color:#06C167;'>👻 THE PHANTOM COMBO</h1>", unsafe_allow_html=True)
 
-# --- NAVIGATION LOGIC ---
+# --- WINNER LOGIC (RESTORED) ---
 if not df.empty and any(df['Score'] >= WIN_LIMIT):
     winner_name = df[df['Score'] >= WIN_LIMIT].iloc[0]['Name']
     st.balloons()
@@ -135,6 +135,7 @@ if not df.empty and any(df['Score'] >= WIN_LIMIT):
         conn.update(data=df)
         st.rerun()
 
+# --- TOURNAMENT SETUP (RESTORED) ---
 elif len(df) < 2:
     display_logo()
     st.subheader("Tournament Setup")
@@ -142,10 +143,11 @@ elif len(df) < 2:
     p2_in = st.text_input("Player 2 Name")
     if st.button("Save Players & Start"):
         if p1_in and p2_in:
-            new_df = pd.DataFrame([{"Name": p1_in, "Score": 0}, {"Name": p2_in, "Score": 0}])
+            new_df = pd.DataFrame([{"Name": p1_in, "Score": 0.0}, {"Name": p2_in, "Score": 0.0}])
             conn.update(data=new_df)
             st.rerun()
 
+# --- MAIN GAMEPLAY LOOP ---
 else:
     display_logo()
     p1_n, p1_s = df.iloc[0]['Name'], df.iloc[0]['Score']
@@ -159,47 +161,50 @@ else:
     with st.form("round_form"):
         st.markdown("### 🎲 ROUND DATA")
         
-        # --- PLAYER 1 SECTION ---
+        # Player 1 Section
         st.markdown(f'<p class="player-label">{p1_n}</p>', unsafe_allow_html=True)
-        p1_stack = st.checkbox("Stacked Order? (2 Deliveries)", key="p1_stack")
         col1, col2 = st.columns(2)
-        p1_c1 = col1.selectbox("Guess 1", FOOD_CATEGORIES, key="p1c1")
-        p1_c2 = col2.selectbox("Guess 2", FOOD_CATEGORIES, key="p1c2")
+        p1_g1 = col1.selectbox("Guess 1", FOOD_CATEGORIES, key="p1c1")
+        p1_g2 = col2.selectbox("Guess 2", FOOD_CATEGORIES, key="p1c2")
         p1_p = st.number_input(f"{p1_n}'s Price Guess", key="p1p", format="%.2f", step=0.01)
         
         st.divider()
 
-        # --- PLAYER 2 SECTION ---
+        # Player 2 Section
         st.markdown(f'<p class="player-label">{p2_n}</p>', unsafe_allow_html=True)
-        p2_stack = st.checkbox("Stacked Order? (2 Deliveries)", key="p2_stack")
         col3, col4 = st.columns(2)
-        p2_c1 = col3.selectbox("Guess 1", FOOD_CATEGORIES, key="p2c1")
-        p2_c2 = col4.selectbox("Guess 2", FOOD_CATEGORIES, key="p2c2")
+        p2_g1 = col3.selectbox("Guess 1", FOOD_CATEGORIES, key="p2c1")
+        p2_g2 = col4.selectbox("Guess 2", FOOD_CATEGORIES, key="p2c2")
         p2_p = st.number_input(f"{p2_n}'s Price Guess", key="p2p", format="%.2f", step=0.01)
         
         st.divider()
         
+        # ACTUAL RESULTS SECTION (NEW STRATEGY)
+        st.markdown("### 🏁 ACTUAL RESULTS")
+        is_stacked = st.checkbox("Stacked Order? (AP × 0.5 Price Comparison)")
         actual_p = st.number_input("Actual Total Price", format="%.2f", step=0.01)
-        # Use multiselect so you can pick both categories for a stacked order
         actual_cats = st.multiselect("Actual Food Category(s)", FOOD_CATEGORIES)
         
         if st.form_submit_button("Submit Round Results"):
-            def calc_player_score(g1, g2, actuals, is_stacked):
-                round_total = 0.0
-                if g1 in actuals: round_total += 1.0
-                if g2 in actuals:
-                    round_total += 1.0 if is_stacked else 0.5
-                return round_total
-
-            p1_r = calc_player_score(p1_c1, p1_c2, actual_cats, p1_stack)
-            p2_r = calc_player_score(p2_c1, p2_c2, actual_cats, p2_stack)
+            # Math logic: Target is 50% of price if stacked
+            target_p = actual_p * 0.5 if is_stacked else actual_p
             
-            # Price closest logic
-            d1, d2 = abs(p1_p - actual_p), abs(p2_p - actual_p)
+            def calc_pts(g1, g2, actuals, stacked):
+                pts = 0.0
+                if g1 in actuals: pts += 1.0
+                if g2 in actuals: pts += 1.0 if stacked else 0.5
+                return pts
+
+            p1_r = calc_pts(p1_g1, p1_g2, actual_cats, is_stacked)
+            p2_r = calc_pts(p2_g1, p2_g2, actual_cats, is_stacked)
+            
+            # Price Point: Closest to target (Total or Half)
+            d1, d2 = abs(p1_p - target_p), abs(p2_p - target_p)
             if d1 < d2: p1_r += 1
             elif d2 < d1: p2_r += 1
             else: p1_r += 1; p2_r += 1
             
+            # Update and Rerun
             df.at[0, 'Score'] = p1_s + p1_r
             df.at[1, 'Score'] = p2_s + p2_r
             conn.update(data=df)
