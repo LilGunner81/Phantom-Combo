@@ -103,13 +103,17 @@ except Exception as e:
     df = pd.DataFrame(columns=["Name", "Score"])
 
 if not df.empty:
-    # Set to float to handle 0.5 scoring
     df['Score'] = pd.to_numeric(df['Score'], errors='coerce').fillna(0).astype(float)
 
-# --- SIDEBAR RESET (RESTORED) ---
+# --- LOCK STATE LOGIC ---
+if 'guesses_locked' not in st.session_state:
+    st.session_state.guesses_locked = False
+
+# --- SIDEBAR RESET ---
 with st.sidebar:
     st.header("Admin Controls")
     if st.button("🗑️ Reset All (New Players)"):
+        st.session_state.guesses_locked = False
         empty_df = pd.DataFrame(columns=["Name", "Score"])
         conn.update(data=empty_df)
         st.success("Tournament Reset!")
@@ -124,7 +128,7 @@ def display_logo():
     except:
         st.markdown("<h1 style='text-align:center; color:#06C167;'>👻 THE PHANTOM COMBO</h1>", unsafe_allow_html=True)
 
-# --- WINNER LOGIC (RESTORED) ---
+# --- WINNER LOGIC ---
 if not df.empty and any(df['Score'] >= WIN_LIMIT):
     winner_name = df[df['Score'] >= WIN_LIMIT].iloc[0]['Name']
     st.balloons()
@@ -133,9 +137,10 @@ if not df.empty and any(df['Score'] >= WIN_LIMIT):
     if st.button("Start New Tournament"):
         df['Score'] = 0
         conn.update(data=df)
+        st.session_state.guesses_locked = False
         st.rerun()
 
-# --- TOURNAMENT SETUP (RESTORED) ---
+# --- TOURNAMENT SETUP ---
 elif len(df) < 2:
     display_logo()
     st.subheader("Tournament Setup")
@@ -159,53 +164,68 @@ else:
     st.progress(min(p2_s / WIN_LIMIT, 1.0), text=f"{p2_n}'s Path")
 
     with st.form("round_form"):
-        st.markdown("### 🎲 ROUND DATA")
+        st.markdown("### 🎲 ROUND GUESSES")
+        
+        # Disable guesses if locked
+        is_locked = st.session_state.guesses_locked
         
         # Player 1 Section
         st.markdown(f'<p class="player-label">{p1_n}</p>', unsafe_allow_html=True)
         col1, col2 = st.columns(2)
-        p1_g1 = col1.selectbox("Guess 1", FOOD_CATEGORIES, key="p1c1")
-        p1_g2 = col2.selectbox("Guess 2", FOOD_CATEGORIES, key="p1c2")
-        p1_p = st.number_input(f"{p1_n}'s Price Guess", key="p1p", format="%.2f", step=0.01)
+        p1_g1 = col1.selectbox("Guess 1", FOOD_CATEGORIES, key="p1c1", disabled=is_locked)
+        p1_g2 = col2.selectbox("Guess 2", FOOD_CATEGORIES, key="p1c2", disabled=is_locked)
+        p1_p = st.number_input(f"{p1_n}'s Price Guess", key="p1p", format="%.2f", step=0.01, disabled=is_locked)
         
         st.divider()
 
         # Player 2 Section
         st.markdown(f'<p class="player-label">{p2_n}</p>', unsafe_allow_html=True)
         col3, col4 = st.columns(2)
-        p2_g1 = col3.selectbox("Guess 1", FOOD_CATEGORIES, key="p2c1")
-        p2_g2 = col4.selectbox("Guess 2", FOOD_CATEGORIES, key="p2c2")
-        p2_p = st.number_input(f"{p2_n}'s Price Guess", key="p2p", format="%.2f", step=0.01)
-        
-        st.divider()
-        
-        # ACTUAL RESULTS SECTION (NEW STRATEGY)
-        st.markdown("### 🏁 ACTUAL RESULTS")
-        is_stacked = st.checkbox("Stacked Order? (AP × 0.5 Price Comparison)")
-        actual_p = st.number_input("Actual Total Price", format="%.2f", step=0.01)
-        actual_cats = st.multiselect("Actual Food Category(s)", FOOD_CATEGORIES)
-        
-        if st.form_submit_button("Submit Round Results"):
-            # Math logic: Target is 50% of price if stacked
-            target_p = actual_p * 0.5 if is_stacked else actual_p
-            
-            def calc_pts(g1, g2, actuals, stacked):
-                pts = 0.0
-                if g1 in actuals: pts += 1.0
-                if g2 in actuals: pts += 1.0 if stacked else 0.5
-                return pts
+        p2_g1 = col3.selectbox("Guess 1", FOOD_CATEGORIES, key="p2c1", disabled=is_locked)
+        p2_g2 = col4.selectbox("Guess 2", FOOD_CATEGORIES, key="p2c2", disabled=is_locked)
+        p2_p = st.number_input(f"{p2_n}'s Price Guess", key="p2p", format="%.2f", step=0.01, disabled=is_locked)
 
-            p1_r = calc_pts(p1_g1, p1_g2, actual_cats, is_stacked)
-            p2_r = calc_pts(p2_g1, p2_g2, actual_cats, is_stacked)
+        # LOCK BUTTON
+        if not is_locked:
+            if st.form_submit_button("🔒 LOCK IN GUESSES"):
+                st.session_state.guesses_locked = True
+                st.rerun()
+        
+        # ACTUAL RESULTS SECTION (Only appears after lock)
+        if is_locked:
+            st.markdown("### 🏁 ACTUAL RESULTS")
+            is_stacked = st.checkbox("Stacked Order? (AP × 0.5 Price Comparison)")
+            actual_p = st.number_input("Actual Total Price", format="%.2f", step=0.01)
+            actual_cats = st.multiselect("Actual Food Category(s)", FOOD_CATEGORIES)
             
-            # Price Point: Closest to target (Total or Half)
-            d1, d2 = abs(p1_p - target_p), abs(p2_p - target_p)
-            if d1 < d2: p1_r += 1
-            elif d2 < d1: p2_r += 1
-            else: p1_r += 1; p2_r += 1
+            col_sub, col_unl = st.columns([3, 1])
             
-            # Update and Rerun
-            df.at[0, 'Score'] = p1_s + p1_r
-            df.at[1, 'Score'] = p2_s + p2_r
-            conn.update(data=df)
-            st.rerun()
+            if col_sub.form_submit_button("🚀 SUBMIT ROUND RESULTS"):
+                # Math logic: Target is 50% of price if stacked
+                target_p = actual_p * 0.5 if is_stacked else actual_p
+                
+                def calc_pts(g1, g2, actuals, stacked):
+                    pts = 0.0
+                    if g1 in actuals: pts += 1.0
+                    if g2 in actuals: pts += 1.0 if stacked else 0.5
+                    return pts
+
+                p1_r = calc_pts(p1_g1, p1_g2, actual_cats, is_stacked)
+                p2_r = calc_pts(p2_g1, p2_g2, actual_cats, is_stacked)
+                
+                # Price Point: Closest to target (Total or Half)
+                d1, d2 = abs(p1_p - target_p), abs(p2_p - target_p)
+                if d1 < d2: p1_r += 1
+                elif d2 < d1: p2_r += 1
+                else: p1_r += 1; p2_r += 1
+                
+                # Update DB
+                df.at[0, 'Score'] = p1_s + p1_r
+                df.at[1, 'Score'] = p2_s + p2_r
+                conn.update(data=df)
+                st.session_state.guesses_locked = False
+                st.rerun()
+
+            if col_unl.form_submit_button("🔓 UNLOCK"):
+                st.session_state.guesses_locked = False
+                st.rerun()
