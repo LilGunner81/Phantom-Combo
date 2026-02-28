@@ -103,7 +103,8 @@ except Exception as e:
     df = pd.DataFrame(columns=["Name", "Score"])
 
 if not df.empty:
-    df['Score'] = pd.to_numeric(df['Score'], errors='coerce').fillna(0).astype(int)
+    # IMPORTANT: Scores are now floats to handle 0.5 point increments
+    df['Score'] = pd.to_numeric(df['Score'], errors='coerce').fillna(0).astype(float)
 
 # --- SIDEBAR RESET ---
 with st.sidebar:
@@ -147,8 +148,8 @@ elif len(df) < 2:
 
 else:
     display_logo()
-    p1_n, p1_s = df.iloc[0]['Name'], int(df.iloc[0]['Score'])
-    p2_n, p2_s = df.iloc[1]['Name'], int(df.iloc[1]['Score'])
+    p1_n, p1_s = df.iloc[0]['Name'], df.iloc[0]['Score']
+    p2_n, p2_s = df.iloc[1]['Name'], df.iloc[1]['Score']
 
     st.markdown(f'<div class="score-box">{p1_s} — {p2_s}</div>', unsafe_allow_html=True)
     
@@ -157,21 +158,43 @@ else:
 
     with st.form("round_form"):
         st.markdown("### 🎲 ROUND DATA")
+        
+        # --- PLAYER 1 SECTION ---
         st.markdown(f'<p class="player-label">{p1_n}</p>', unsafe_allow_html=True)
-        p1_p = st.number_input("Price Guess", key="p1p", format="%.2f", step=0.01)
-        p1_c = st.selectbox("Category Guess", FOOD_CATEGORIES, key="p1c")
+        p1_stack = st.checkbox("Stacked Order? (2 Deliveries)", key="p1_stack")
+        col1, col2 = st.columns(2)
+        p1_c1 = col1.selectbox("Guess 1", FOOD_CATEGORIES, key="p1c1")
+        p1_c2 = col2.selectbox("Guess 2", FOOD_CATEGORIES, key="p1c2")
+        p1_p = st.number_input(f"{p1_n}'s Price Guess", key="p1p", format="%.2f", step=0.01)
+        
         st.divider()
+
+        # --- PLAYER 2 SECTION ---
         st.markdown(f'<p class="player-label">{p2_n}</p>', unsafe_allow_html=True)
-        p2_p = st.number_input("Price Guess", key="p2p", format="%.2f", step=0.01)
-        p2_c = st.selectbox("Category Guess", FOOD_CATEGORIES, key="p2c")
+        p2_stack = st.checkbox("Stacked Order? (2 Deliveries)", key="p2_stack")
+        col3, col4 = st.columns(2)
+        p2_c1 = col3.selectbox("Guess 1", FOOD_CATEGORIES, key="p2c1")
+        p2_c2 = col4.selectbox("Guess 2", FOOD_CATEGORIES, key="p2c2")
+        p2_p = st.number_input(f"{p2_n}'s Price Guess", key="p2p", format="%.2f", step=0.01)
+        
         st.divider()
+        
         actual_p = st.number_input("Actual Total Price", format="%.2f", step=0.01)
-        actual_c = st.selectbox("Actual Category", FOOD_CATEGORIES, key="actc")
+        # Use multiselect so you can pick both categories for a stacked order
+        actual_cats = st.multiselect("Actual Food Category(s)", FOOD_CATEGORIES)
         
         if st.form_submit_button("Submit Round Results"):
-            p1_r, p2_r = 0, 0
-            if p1_c == actual_c: p1_r += 1
-            if p2_c == actual_c: p2_r += 1
+            def calc_player_score(g1, g2, actuals, is_stacked):
+                round_total = 0.0
+                if g1 in actuals: round_total += 1.0
+                if g2 in actuals:
+                    round_total += 1.0 if is_stacked else 0.5
+                return round_total
+
+            p1_r = calc_player_score(p1_c1, p1_c2, actual_cats, p1_stack)
+            p2_r = calc_player_score(p2_c1, p2_c2, actual_cats, p2_stack)
+            
+            # Price closest logic
             d1, d2 = abs(p1_p - actual_p), abs(p2_p - actual_p)
             if d1 < d2: p1_r += 1
             elif d2 < d1: p2_r += 1
