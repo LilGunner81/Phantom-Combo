@@ -93,6 +93,10 @@ st.markdown(f"""
     </style>
     """, unsafe_allow_html=True)
 
+# --- DB COLUMNS DEFINITION ---
+# Updated to include your exact requested columns
+DB_COLUMNS = ["Name", "Score", "P1 Cat1", "P1 Cat2", "P1 $", "P2 Cat1", "P2 Cat2", "P2 $"]
+
 # --- DB CONNECTION ---
 conn = st.connection("gsheets", type=GSheetsConnection)
 
@@ -100,7 +104,7 @@ try:
     df = conn.read(ttl=0)
 except Exception as e:
     st.error(f"Connection Error: {e}")
-    df = pd.DataFrame(columns=["Name", "Score"])
+    df = pd.DataFrame(columns=DB_COLUMNS)
 
 if not df.empty:
     df['Score'] = pd.to_numeric(df['Score'], errors='coerce').fillna(0).astype(float)
@@ -114,7 +118,7 @@ with st.sidebar:
     st.header("Admin Controls")
     if st.button("🗑️ Reset All (New Players)"):
         st.session_state.guesses_locked = False
-        empty_df = pd.DataFrame(columns=["Name", "Score"])
+        empty_df = pd.DataFrame(columns=DB_COLUMNS)
         conn.update(data=empty_df)
         st.success("Tournament Reset!")
         st.rerun()
@@ -148,7 +152,11 @@ elif len(df) < 2:
     p2_in = st.text_input("Player 2 Name")
     if st.button("Save Players & Start"):
         if p1_in and p2_in:
-            new_df = pd.DataFrame([{"Name": p1_in, "Score": 0.0}, {"Name": p2_in, "Score": 0.0}])
+            # Initialize both players with the new columns empty/zeroed out
+            new_df = pd.DataFrame([
+                {"Name": p1_in, "Score": 0.0, "P1 Cat1": "", "P1 Cat2": "", "P1 $": 0.0, "P2 Cat1": "", "P2 Cat2": "", "P2 $": 0.0},
+                {"Name": p2_in, "Score": 0.0, "P1 Cat1": "", "P1 Cat2": "", "P1 $": 0.0, "P2 Cat1": "", "P2 Cat2": "", "P2 $": 0.0}
+            ])
             conn.update(data=new_df)
             st.rerun()
 
@@ -201,7 +209,6 @@ else:
             col_sub, col_unl = st.columns([3, 1])
             
             if col_sub.form_submit_button("🚀 SUBMIT ROUND RESULTS"):
-                # Math logic: Target is 50% of price if stacked
                 target_p = actual_p * 0.5 if is_stacked else actual_p
                 
                 def calc_pts(g1, g2, actuals, stacked):
@@ -213,15 +220,24 @@ else:
                 p1_r = calc_pts(p1_g1, p1_g2, actual_cats, is_stacked)
                 p2_r = calc_pts(p2_g1, p2_g2, actual_cats, is_stacked)
                 
-                # Price Point: Closest to target (Total or Half)
                 d1, d2 = abs(p1_p - target_p), abs(p2_p - target_p)
                 if d1 < d2: p1_r += 1
                 elif d2 < d1: p2_r += 1
                 else: p1_r += 1; p2_r += 1
                 
-                # Update DB
+                # --- UPDATE THE DB WITH SCORES AND NEW GUESSES ---
                 df.at[0, 'Score'] = p1_s + p1_r
                 df.at[1, 'Score'] = p2_s + p2_r
+                
+                # Write the latest guesses to the DataFrame using the widget keys
+                for idx in [0, 1]:  # Populates both rows so the sheet looks clean
+                    df.at[idx, 'P1 Cat1'] = st.session_state.p1c1
+                    df.at[idx, 'P1 Cat2'] = st.session_state.p1c2
+                    df.at[idx, 'P1 $'] = st.session_state.p1p
+                    df.at[idx, 'P2 Cat1'] = st.session_state.p2c1
+                    df.at[idx, 'P2 Cat2'] = st.session_state.p2c2
+                    df.at[idx, 'P2 $'] = st.session_state.p2p
+
                 conn.update(data=df)
                 st.session_state.guesses_locked = False
                 st.rerun()
