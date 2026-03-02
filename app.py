@@ -68,7 +68,7 @@ st.markdown(f"""
 
 # --- DB & CONSTANTS ---
 DB_COLUMNS = ["Name", "Score", "P1 Cat1", "P1 Cat2", "P1 $", "P2 Cat1", "P2 Cat2", "P2 $"]
-FOOD_CATEGORIES = ["Italian", "Sushi", "Mediterranean", "Eastern Asian", "Sandwiches", "Asian", "Mexican", "South Asian", "Chicken", "Shop and Deliver", "Liquor", "Other"]
+FOOD_CATEGORIES = ["Italian", "Sushi", "Mediterranean", "Eastern Asian", "Sandwiches", "Asian", "Mexican", "South Asian", "Chicken", "Shop and Deliver", "Liquor", "Bakery", "Fish and Chips", "Other"]
 WIN_LIMIT = 25
 
 conn = st.connection("gsheets", type=GSheetsConnection)
