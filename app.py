@@ -78,6 +78,9 @@ def get_data():
         data = conn.read(ttl=0)
         if not data.empty:
             data['Score'] = pd.to_numeric(data['Score'], errors='coerce').fillna(0).astype(float)
+            # Ensure price columns are numeric
+            for col in ['P1 $', 'P2 $']:
+                data[col] = pd.to_numeric(data[col], errors='coerce').fillna(0.0)
         return data
     except:
         return pd.DataFrame(columns=DB_COLUMNS)
@@ -86,12 +89,10 @@ df = get_data()
 
 # --- CALLBACK LOGIC ---
 def handle_submission():
-    # 1. Fetch current scores fresh
     fresh_df = get_data()
     p1_s = fresh_df.iloc[0]['Score']
     p2_s = fresh_df.iloc[1]['Score']
     
-    # 2. Logic Variables from session_state
     actual_p = st.session_state.actual_p
     actual_cats = st.session_state.actual_cats
     is_stacked = st.session_state.is_stacked
@@ -103,7 +104,6 @@ def handle_submission():
         if g2 in actuals: pts += 1.0 if stacked else 0.5
         return pts
 
-    # Calculate Score
     p1_r = calc_pts(st.session_state.p1c1, st.session_state.p1c2, actual_cats, is_stacked)
     p2_r = calc_pts(st.session_state.p2c1, st.session_state.p2c2, actual_cats, is_stacked)
     
@@ -112,25 +112,30 @@ def handle_submission():
     elif d2 < d1: p2_r += 1
     else: p1_r += 1; p2_r += 1
     
-    # 3. Update DataFrame
     fresh_df.at[0, 'Score'] = p1_s + p1_r
     fresh_df.at[1, 'Score'] = p2_s + p2_r
     
+    # Save choices to the sheet
     for idx in [0, 1]:
         fresh_df.at[idx, 'P1 Cat1'] = st.session_state.p1c1
         fresh_df.at[idx, 'P1 Cat2'] = st.session_state.p1c2
-        fresh_df.at[idx, 'P1 $'] = st.session_state.p1p
+        fresh_df.at[idx, 'P1 $'] = float(st.session_state.p1p)
         fresh_df.at[idx, 'P2 Cat1'] = st.session_state.p2c1
         fresh_df.at[idx, 'P2 Cat2'] = st.session_state.p2c2
-        fresh_df.at[idx, 'P2 $'] = st.session_state.p2p
+        fresh_df.at[idx, 'P2 $'] = float(st.session_state.p2p)
 
-    # 4. Save and Reset State
     conn.update(data=fresh_df)
     st.session_state.guesses_locked = False
 
 # --- STATE MANAGEMENT ---
 if 'guesses_locked' not in st.session_state:
     st.session_state.guesses_locked = False
+
+def get_cat_index(val):
+    try:
+        return FOOD_CATEGORIES.index(val)
+    except:
+        return 0
 
 # --- UI HELPERS ---
 def display_logo():
@@ -167,15 +172,17 @@ elif len(df) < 2:
     if st.button("Save Players & Start"):
         if p1_in and p2_in:
             new_df = pd.DataFrame([
-                {"Name": p1_in, "Score": 0.0, "P1 Cat1": "", "P1 Cat2": "", "P1 $": 0.0, "P2 Cat1": "", "P2 Cat2": "", "P2 $": 0.0},
-                {"Name": p2_in, "Score": 0.0, "P1 Cat1": "", "P1 Cat2": "", "P1 $": 0.0, "P2 Cat1": "", "P2 Cat2": "", "P2 $": 0.0}
+                {"Name": p1_in, "Score": 0.0, "P1 Cat1": "Other", "P1 Cat2": "Other", "P1 $": 0.0, "P2 Cat1": "Other", "P2 Cat2": "Other", "P2 $": 0.0},
+                {"Name": p2_in, "Score": 0.0, "P1 Cat1": "Other", "P1 Cat2": "Other", "P1 $": 0.0, "P2 Cat1": "Other", "P2 Cat2": "Other", "P2 $": 0.0}
             ])
             conn.update(data=new_df)
             st.rerun()
 
 else:
     display_logo()
-    p1_n, p1_s = df.iloc[0]['Name'], df.iloc[0]['Score']
+    # Pull current values from DF for persistent UI
+    row = df.iloc[0]
+    p1_n, p1_s = row['Name'], row['Score']
     p2_n, p2_s = df.iloc[1]['Name'], df.iloc[1]['Score']
 
     st.markdown(f'<div class="score-box">{int(p1_s)} — {int(p2_s)}</div>', unsafe_allow_html=True)
@@ -190,18 +197,27 @@ else:
         
         with col_p1:
             st.markdown(f'<p class="player-label">{p1_n}</p>', unsafe_allow_html=True)
-            st.selectbox("Guess 1", FOOD_CATEGORIES, key="p1c1", disabled=is_locked)
-            st.selectbox("Guess 2", FOOD_CATEGORIES, key="p1c2", disabled=is_locked)
-            st.number_input("Price Guess", key="p1p", format="%.2f", step=0.01, disabled=is_locked)
+            st.selectbox("Guess 1", FOOD_CATEGORIES, key="p1c1", disabled=is_locked, index=get_cat_index(row['P1 Cat1']))
+            st.selectbox("Guess 2", FOOD_CATEGORIES, key="p1c2", disabled=is_locked, index=get_cat_index(row['P1 Cat2']))
+            st.number_input("Price Guess", key="p1p", format="%.2f", step=0.01, disabled=is_locked, value=float(row['P1 $']))
         
         with col_p2:
             st.markdown(f'<p class="player-label">{p2_n}</p>', unsafe_allow_html=True)
-            st.selectbox("Guess 1", FOOD_CATEGORIES, key="p2c1", disabled=is_locked)
-            st.selectbox("Guess 2", FOOD_CATEGORIES, key="p2c2", disabled=is_locked)
-            st.number_input("Price Guess", key="p2p", format="%.2f", step=0.01, disabled=is_locked)
+            st.selectbox("Guess 1", FOOD_CATEGORIES, key="p2c1", disabled=is_locked, index=get_cat_index(row['P2 Cat1']))
+            st.selectbox("Guess 2", FOOD_CATEGORIES, key="p2c2", disabled=is_locked, index=get_cat_index(row['P2 Cat2']))
+            st.number_input("Price Guess", key="p2p", format="%.2f", step=0.01, disabled=is_locked, value=float(row['P2 $']))
 
         if not is_locked:
             if st.form_submit_button("🔒 LOCK IN GUESSES"):
+                # Even if we aren't scoring yet, update the sheet with current "Locked" choices
+                for idx in [0, 1]:
+                    df.at[idx, 'P1 Cat1'] = st.session_state.p1c1
+                    df.at[idx, 'P1 Cat2'] = st.session_state.p1c2
+                    df.at[idx, 'P1 $'] = float(st.session_state.p1p)
+                    df.at[idx, 'P2 Cat1'] = st.session_state.p2c1
+                    df.at[idx, 'P2 Cat2'] = st.session_state.p2c2
+                    df.at[idx, 'P2 $'] = float(st.session_state.p2p)
+                conn.update(data=df)
                 st.session_state.guesses_locked = True
                 st.rerun()
         
@@ -213,7 +229,6 @@ else:
             st.multiselect("Actual Food Category(s)", FOOD_CATEGORIES, key="actual_cats")
             
             c_sub, c_unl = st.columns([3, 1])
-            # Use on_click callback here
             c_sub.form_submit_button("🚀 SUBMIT ROUND", on_click=handle_submission)
             
             if c_unl.form_submit_button("🔓 UNLOCK"):
